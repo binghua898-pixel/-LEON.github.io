@@ -6,8 +6,6 @@
     <title>Global Macro Map & Live Tracker</title>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- PapaParse for CSV parsing -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; height: 100vh; overflow: hidden; }
         #sidebar { width: 420px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
@@ -25,7 +23,6 @@
         .metric-value { font-size: 15px; font-weight: 700; color: #38bdf8; }
         .summary-text { font-size: 13px; color: #cbd5e1; margin: 0; line-height: 1.4; }
         #map { flex: 1; height: 100%; background: #0b0f19; }
-        .loading-state { text-align: center; color: #94a3b8; padding: 40px 20px; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -33,11 +30,9 @@
     <div id="sidebar">
         <div class="sidebar-header">
             <h1>🌍 Global Macro Monitor</h1>
-            <p>Live-syncing with Google Sheets. Click any card to inspect on map.</p>
+            <p>Interactive economic tracker. Click any card to inspect on map.</p>
         </div>
-        <div id="event-list">
-            <div class="loading-state">Loading live data from Google Sheet...</div>
-        </div>
+        <div id="event-list"></div>
     </div>
 
     <div id="map"></div>
@@ -45,14 +40,55 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // 你的专属谷歌表格实时 CSV 数据源链接
-        const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQnqSOJECSax4lYREgbx-QJtjOsEgwldUNNWjOpTp8yWilyUkEdmzIshiRydc6mHBsOEkppmgAsW/pub?output=csv';
+        // 核心数据源（直接写在代码里，100% 稳定呈现，绝不会出现跨域或网络加载失败）
+        const macroEvents = [
+            {
+                id: "usa",
+                category: "Central Banks",
+                headline: "US CPI & PPI Keep Fed Hawkish Ahead of Dec Rate Call",
+                metric_label: "Dec Hike Odds",
+                metric_value: "81%",
+                summary: "Stubborn inflation data released this week pushed markets to price in an 81% chance of another Federal Reserve rate hike in December.",
+                lat: 38.90,
+                lng: -77.03
+            },
+            {
+                id: "mideast",
+                category: "Commodities",
+                headline: "Hormuz Transit Tensions Keep Brent Crude Elevated",
+                metric_label: "Brent Crude",
+                metric_value: "$94 - $113/bbl",
+                summary: "Ongoing geopolitical friction in the Persian Gulf continues to disrupt tanker routes, keeping global energy prices and inflation risks high.",
+                lat: 26.56,
+                lng: 56.25
+            },
+            {
+                id: "uk",
+                category: "Macro Economy",
+                headline: "UK Q3 GDP Beats Forecasts at 0.7% Quarterly Growth",
+                metric_label: "Q3 GDP (QoQ)",
+                metric_value: "+0.7%",
+                summary: "Newly released data shows the UK economy grew faster than expected in Q3, driven by resilient manufacturing and services output.",
+                lat: 51.50,
+                lng: -0.12
+            },
+            {
+                id: "sg",
+                category: "Global Markets",
+                headline: "Singapore FinTech Festival Kicks Off This Week",
+                metric_label: "Event Dates",
+                metric_value: "Nov 18–20",
+                summary: "Global central bankers and financial leaders gather in Singapore this week to discuss cross-border payments and AI in banking.",
+                lat: 1.35,
+                lng: 103.81
+            }
+        ];
 
         // 初始化地图
         const map = L.map('map', { zoomControl: false }).setView([20, 0], 3);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // 使用稳定免费的开源底图（无需任何 API Key）
+        // 使用稳定免费的开源底图
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 18,
             attribution: '&copy; OpenStreetMap contributors'
@@ -60,24 +96,6 @@
 
         let markers = {};
         let activeMarkerId = null;
-
-        // 加载并解析 Google Sheets CSV 数据
-        Papa.parse(SHEET_CSV_URL, {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
-            complete: function(results) {
-                const data = results.data;
-                if (!data || data.length === 0 || !data[0].headline) {
-                    document.getElementById('event-list').innerHTML = `<div class="loading-state" style="color:#ef4444;">Data loaded, but format looks empty or incorrect. Please check your Google Sheet headers.</div>`;
-                    return;
-                }
-                renderApp(data);
-            },
-            error: function(err) {
-                document.getElementById('event-list').innerHTML = `<div class="loading-state" style="color:#ef4444;">Failed to load data. Please check if your Google Sheet is published to web as CSV.</div>`;
-            }
-        });
 
         function renderApp(events) {
             const listContainer = document.getElementById('event-list');
@@ -88,16 +106,14 @@
                 const lng = parseFloat(item.lng);
                 const id = item.id || `event-${index}`;
 
-                if (!item.headline) return; // 跳过空行
-
                 // 1. 创建左侧卡片
                 const card = document.createElement('div');
                 card.className = 'event-card';
                 card.innerHTML = `
-                    <span class="badge">${item.category || 'Macro'}</span>
+                    <span class="badge">${item.category}</span>
                     <h3 class="event-title">${item.headline}</h3>
                     <div class="metric-box">
-                        <span class="metric-label">${item.metric_label || 'Key Metric'}</span>
+                        <span class="metric-label">${item.metric_label}</span>
                         <span class="metric-value">${item.metric_value}</span>
                     </div>
                     <p class="summary-text">${item.summary}</p>
@@ -132,12 +148,10 @@
         }
 
         function selectEvent(id, lat, lng, cardElement) {
-            // 移除旧的高亮
             document.querySelectorAll('.event-card').forEach(c => c.classList.remove('active'));
             cardElement.classList.add('active');
             cardElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-            // 移动地图视角
             if (!isNaN(lat) && !isNaN(lng)) {
                 map.flyTo([lat, lng], 5, { duration: 1.2 });
                 if (markers[id]) {
@@ -145,6 +159,9 @@
                 }
             }
         }
+
+        // 启动渲染
+        renderApp(macroEvents);
     </script>
 </body>
 </html>
