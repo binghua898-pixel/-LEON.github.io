@@ -52,10 +52,10 @@
         const map = L.map('map', { zoomControl: false }).setView([20, 0], 3);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // 使用暗色系地图底图
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        // 使用稳定免费的开源底图（无需任何 API Key）
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 18,
-            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+            attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
         let markers = {};
@@ -68,10 +68,14 @@
             skipEmptyLines: true,
             complete: function(results) {
                 const data = results.data;
+                if (!data || data.length === 0 || !data[0].headline) {
+                    document.getElementById('event-list').innerHTML = `<div class="loading-state" style="color:#ef4444;">Data loaded, but format looks empty or incorrect. Please check your Google Sheet headers.</div>`;
+                    return;
+                }
                 renderApp(data);
             },
             error: function(err) {
-                document.getElementById('event-list').innerHTML = `<div class="loading-state" style="color:#ef4444;">Failed to load data. Please check your Google Sheet publish link.</div>`;
+                document.getElementById('event-list').innerHTML = `<div class="loading-state" style="color:#ef4444;">Failed to load data. Please check if your Google Sheet is published to web as CSV.</div>`;
             }
         });
 
@@ -83,6 +87,8 @@
                 const lat = parseFloat(item.lat);
                 const lng = parseFloat(item.lng);
                 const id = item.id || `event-${index}`;
+
+                if (!item.headline) return; // 跳过空行
 
                 // 1. 创建左侧卡片
                 const card = document.createElement('div');
