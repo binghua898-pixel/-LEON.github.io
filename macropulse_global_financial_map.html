@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MacroPulse | Global Financial Events Map</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS & JS for Interactive World Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e32',
+                            900: '#0f172a',
+                            950: '#090d16',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* Leaflet Dark Theme Overrides */
+        .leaflet-container {
+            background-color: #090d16 !important;
+            font-family: 'Inter', sans-serif !important;
+        }
+        .leaflet-control-attribution {
+            background: rgba(15, 23, 42, 0.75) !important;
+            color: #64748b !important;
+            font-size: 10px !important;
+            border-top-left-radius: 8px;
+        }
+        .leaflet-control-attribution a {
+            color: #94a3b8 !important;
+        }
+        .leaflet-control-zoom {
+            border: 1px solid #1e293b !important;
+            border-radius: 12px !important;
+            overflow: hidden;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+        }
+        .leaflet-control-zoom a {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+            border-bottom: 1px solid #1e293b !important;
+        }
+        .leaflet-control-zoom a:hover {
+            background-color: #1e293b !important;
+            color: #38bdf8 !important;
+        }
+
+        /* Custom Pulsing Map Hotspots */
+        .hotspot-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .hotspot-ring {
+            position: absolute;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            animation: pulse-ring 2.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+            pointer-events: none;
+        }
+        .hotspot-core {
+            position: relative;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2.5px solid #ffffff;
+            box-shadow: 0 0 15px rgba(0,0,0,0.8);
+            transition: transform 0.2s ease;
+            z-index: 2;
+        }
+        .hotspot-wrapper:hover .hotspot-core {
+            transform: scale(1.3);
+        }
+        .hotspot-label {
+            position: absolute;
+            top: 24px;
+            white-space: nowrap;
+            background: rgba(15, 23, 42, 0.92);
+            border: 1px solid rgba(51, 65, 85, 0.9);
+            color: #f8fafc;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+        }
+
+        /* Color variants for hotspots */
+        .theme-emerald .hotspot-ring { background-color: rgba(16, 185, 129, 0.55); }
+        .theme-emerald .hotspot-core { background-color: #10b981; }
+
+        .theme-rose .hotspot-ring { background-color: rgba(244, 63, 94, 0.55); }
+        .theme-rose .hotspot-core { background-color: #f43f5e; }
+
+        .theme-amber .hotspot-ring { background-color: rgba(245, 158, 11, 0.55); }
+        .theme-amber .hotspot-core { background-color: #f59e0b; }
+
+        .theme-sky .hotspot-ring { background-color: rgba(14, 165, 233, 0.55); }
+        .theme-sky .hotspot-core { background-color: #0ea5e9; }
+
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.45);
+                opacity: 0.9;
+            }
+            80%, 100% {
+                transform: scale(1.6);
+                opacity: 0;
+            }
+        }
+
+        /* Custom Range Slider Styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            background: #1e293b;
+            height: 8px;
+            border-radius: 999px;
+            border: 1px solid #334155;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            margin-top: -6px;
+            background-color: #38bdf8;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+            transition: transform 0.15s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-screen w-screen overflow-hidden flex flex-col select-none">
+
+    <!-- TOP COMMAND HEADER -->
+    <header class="bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-4 py-3 z-30 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <!-- Brand & Prototype Tag -->
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+                <i class="ph-bold ph-globe-hemisphere-west text-white text-xl"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="font-bold text-base sm:text-lg tracking-tight text-white">MacroPulse</h1>
+                    <span class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                        Prototype • Sample Data
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400 hidden sm:block">Interactive Global Finance &amp; Economics Radar for Students</p>
+            </div>
+        </div>
+
+        <!-- Category Filter Pills (Desktop & Tablet) -->
+        <nav id="category-filters" class="flex items-center gap-1.5 overflow-x-auto max-w-full py-1 order-3 lg:order-2">
+            <button data-filter="all" class="filter-btn active px-3 py-1.5 rounded-full text-xs font-semibold transition-all bg-sky-500 text-slate-950 shadow-md shadow-sky-500/25 whitespace-nowrap">
+                All Events (4)
+            </button>
+            <button data-filter="rates" class="filter-btn px-3 py-1.5 rounded-full text-xs font-medium transition-all bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/70 whitespace-nowrap">
+                <i class="ph-fill ph-bank text-emerald-400 mr-1"></i>Central Banks &amp; Rates
+            </button>
+            <button data-filter="fx" class="filter-btn px-3 py-1.5 rounded-full text-xs font-medium transition-all bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/70 whitespace-nowrap">
+                <i class="ph-fill ph-currency-circle-dollar text-rose-400 mr-1"></i>FX &amp; Currencies
+            </button>
+            <button data-filter="commodities" class="filter-btn px-3 py-1.5 rounded-full text-xs font-medium transition-all bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/70 whitespace-nowrap">
+                <i class="ph-fill ph-drop text-amber-400 mr-1"></i>Commodities &amp; Trade
+            </button>
+        </nav>
+
+        <!-- Gamified Progress Pill -->
+        <div class="flex items-center gap-2 order-2 lg:order-3">
+            <button id="progress-pill" onclick="toggleProgressModal()" class="flex items-center gap-2.5 bg-slate-800/90 hover:bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-full transition-all group">
+                <div class="flex items-center gap-1 text-amber-400 font-mono text-xs font-bold">
+                    <i class="ph-fill ph-lightning text-sm group-hover:scale-125 transition-transform"></i>
+                    <span id="xp-display">0 XP</span>
+                </div>
+                <span class="h-3.5 w-[1px] bg-slate-700"></span>
+                <div class="text-xs font-medium text-slate-300">
+                    Mastered: <span id="mastered-count" class="text-white font-bold">0/4</span>
+                </div>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE: MAP + QUICK JUMP BAR + SLIDE-OVER DRAWER -->
+    <main class="relative flex-1 w-full h-full overflow-hidden flex">
+        
+        <!-- Interactive Leaflet Map Container -->
+        <div id="map" class="w-full h-full z-10"></div>
+
+        <!-- Floating Bottom Quick-Jump Country Dock (Great for Mobile & Quick Navigation) -->
+        <div class="absolute bottom-5 left-4 right-4 md:right-auto md:left-5 z-20 flex flex-col gap-2 pointer-events-none">
+            <div class="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-2 rounded-2xl shadow-2xl pointer-events-auto max-w-full overflow-x-auto">
+                <div class="flex items-center gap-2">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 px-2 hidden sm:inline-block">
+                        Jump to Hotspot:
+                    </span>
+                    <button onclick="selectEvent('usa')" id="dock-usa" class="dock-btn flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/80 text-xs font-medium transition-all whitespace-nowrap">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span>USA • Fed Rates</span>
+                    </button>
+                    <button onclick="selectEvent('japan')" id="dock-japan" class="dock-btn flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/80 text-xs font-medium transition-all whitespace-nowrap">
+                        <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+                        <span>Japan • Yen FX</span>
+                    </button>
+                    <button onclick="selectEvent('saudi')" id="dock-saudi" class="dock-btn flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/80 text-xs font-medium transition-all whitespace-nowrap">
+                        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                        <span>Saudi Arabia • Oil</span>
+                    </button>
+                    <button onclick="selectEvent('malaysia')" id="dock-malaysia" class="dock-btn flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/80 text-xs font-medium transition-all whitespace-nowrap">
+                        <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                        <span>Malaysia • BNM OPR</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Legend Card (Top Left under Zoom controls) -->
+        <div class="hidden sm:flex flex-col gap-1.5 absolute top-20 left-3 z-20 bg-slate-900/85 backdrop-blur-md border border-slate-800/90 p-3 rounded-xl text-[11px] text-slate-300 shadow-xl pointer-events-none">
+            <div class="font-semibold text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Signal Legend</div>
+            <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span><span>Rate Hold / Bullish Equity</span></div>
+            <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span><span>Currency Volatility / Alert</span></div>
+            <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span><span>Commodity Supply Shock</span></div>
+            <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span><span>Regional Policy Update</span></div>
+        </div>
+
+        <!-- RIGHT SLIDE-OVER INTELLIGENCE DRAWER -->
+        <aside id="intel-drawer" class="fixed md:absolute top-0 right-0 h-full w-full sm:w-[440px] lg:w-[470px] bg-slate-900/98 backdrop-blur-xl border-l border-slate-800 z-40 transform translate-x-full transition-transform duration-300 ease-out flex flex-col shadow-2xl">
+            <!-- Drawer Top Bar -->
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900">
+                <div class="flex items-center gap-2">
+                    <span id="drawer-category-badge" class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        Central Banks &amp; Rates
+                    </span>
+                    <span class="text-[11px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md">
+                        SAMPLE BRIEF
+                    </span>
+                </div>
+                <button onclick="closeDrawer()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors" aria-label="Close panel">
+                    <i class="ph-bold ph-x text-base"></i>
+                </button>
+            </div>
+
+            <!-- Drawer Scrollable Content -->
+            <div id="drawer-content" class="flex-1 overflow-y-auto p-5 space-y-5">
+                <!-- Populated dynamically via JS -->
+            </div>
+        </aside>
+    </main>
+
+    <!-- INTERACTIVE 30-SEC MINI-GAME MODAL -->
+    <div id="game-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+            <!-- Modal Header -->
+            <div class="px-5 py-4 bg-slate-850 border-b border-slate-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                        <i class="ph-bold ph-game-controller text-lg"></i>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-mono uppercase tracking-wider text-sky-400 block">Interactive Concept Lab</span>
+                        <h3 id="game-modal-title" class="font-bold text-white text-base">Be the Central Banker</h3>
+                    </div>
+                </div>
+                <button onclick="closeGameModal()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                    <i class="ph-bold ph-x"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div id="game-modal-body" class="p-5 overflow-y-auto space-y-5">
+                <!-- Dynamic Game Content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MY LEARNING PROGRESS MODAL -->
+    <div id="progress-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div class="px-5 py-4 bg-slate-850 border-b border-slate-800 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="ph-fill ph-trophy text-amber-400 text-xl"></i>
+                    <h3 class="font-bold text-white text-base">My Macro Learning Progress</h3>
+                </div>
+                <button onclick="toggleProgressModal()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white">
+                    <i class="ph-bold ph-x"></i>
+                </button>
+            </div>
+            <div id="progress-modal-body" class="p-5 space-y-4">
+                <!-- Dynamic Progress Content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container" class="fixed top-20 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <script>
+        // =========================================================================
+        // 1. CURATED SAMPLE FINANCIAL EVENTS DATA (100% English, Student-Friendly)
+        // =========================================================================
+        const FINANCIAL_EVENTS = {
+            usa: {
+                id: 'usa',
+                country: 'United States',
+                city: 'Washington, D.C. & New York',
+                coords: [38.9072, -77.0369],
+                category: 'rates',
+                categoryLabel: 'Central Banks & Rates',
+                theme: 'emerald',
+                badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+                headline: 'Federal Reserve Holds Interest Rates Steady at 4.50%',
+                source: 'Sample Macro Brief • Federal Reserve FOMC',
+                timestamp: 'Updated Today • Sample Data',
+                metrics: [
+                    { label: 'Fed Funds Rate', value: '4.50%', change: 'Unchanged', positive: true },
+                    { label: 'S&P 500 Index', value: '5,892', change: '+0.85%', positive: true },
+                    { label: 'US 10Y Yield', value: '4.18%', change: '-0.06%', positive: true }
+                ],
+                breakdown: [
+                    'The US central bank decided not to raise or cut its benchmark borrowing rate today, signaling patience as inflation cools gradually.',
+                    'Lower or stable interest rates reduce borrowing costs for tech companies and consumers, which usually pushes stock prices higher.',
+                    'Because the US Dollar is the world’s reserve currency, this decision sets the tone for global loans, mortgages, and student debt.'
+                ],
+                terms: [
+                    { term: 'Benchmark Interest Rate', def: 'The base rate set by a central bank that influences all other loan and savings rates.' },
+                    { term: 'Cost of Capital', def: 'How expensive it is for a business to borrow money to fund growth.' },
+                    { term: 'Inflation', def: 'The rate at which everyday prices for goods and services rise over time.' }
+                ],
+                game: {
+                    title: 'Be the Central Banker',
+                    concept: 'Interest Rates vs. Inflation & Stocks',
+                    prompt: 'Drag the Federal Funds Rate slider below to see how your policy decision impacts inflation, stock valuations, and student loan rates.',
+                    sliderLabel: 'Set Fed Interest Rate',
+                    min: 1.0,
+                    max: 8.0,
+                    step: 0.5,
+                    defaultVal: 4.5,
+                    unit: '%',
+                    type: 'rates',
+                    quiz: {
+                        question: 'If inflation surges unexpectedly to 7%, what does a central bank typically do to cool down spending?',
+                        options: [
+                            { text: 'Raise interest rates to make borrowing more expensive', correct: true },
+                            { text: 'Cut interest rates to 0% to encourage more borrowing', correct: false },
+                            { text: 'Print extra money to double stock prices immediately', correct: false }
+                        ],
+                        explanation: 'Spot on! Raising interest rates increases borrowing costs, slowing down spending and bringing inflation back under control.'
+                    }
+                },
+                comments: [
+                    { user: 'Alex M. (Finance Sophomore)', time: '18m ago', text: 'Finally makes sense why tech stocks rally whenever the Fed hints at pausing rate hikes!' },
+                    { user: 'Priya K. (Econ Major)', time: '42m ago', text: 'Played the simulator—cranking rates up to 7% really crushes stock valuations fast.' }
+                ]
+            },
+            japan: {
+                id: 'japan',
+                country: 'Japan',
+                city: 'Tokyo Financial District',
+                coords: [35.6762, 139.6503],
+                category: 'fx',
+                categoryLabel: 'FX & Currencies',
+                theme: 'rose',
+                badgeClass: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+                headline: 'Bank of Japan Signals Caution as Yen Fluctuates Near 148/USD',
+                source: 'Sample FX Desk • Tokyo Market Wrap',
+                timestamp: 'Updated Today • Sample Data',
+                metrics: [
+                    { label: 'USD / JPY Rate', value: '148.20', change: '+0.92%', positive: false },
+                    { label: 'BoJ Policy Rate', value: '0.50%', change: 'Ultra-Low', positive: true },
+                    { label: 'Nikkei 225', value: '38,410', change: '-1.10%', positive: false }
+                ],
+                breakdown: [
+                    'Because Japanese interest rates (0.50%) remain much lower than US rates (4.50%), global investors sell Yen to buy higher-yielding US Dollars.',
+                    'A weaker Yen is great news for Japanese exporters like Toyota or Sony because their cars and electronics become cheaper for overseas buyers.',
+                    'However, a weak currency makes imported fuel, food, and overseas travel much more expensive for everyday Japanese students and families.'
+                ],
+                terms: [
+                    { term: 'Exchange Rate (FX)', def: 'The value of one country’s currency compared to another currency.' },
+                    { term: 'Currency Depreciation', def: 'When a currency loses value relative to foreign currencies, making imports costlier.' },
+                    { term: 'Trade Balance', def: 'The difference between the value of a country’s exports and its imports.' }
+                ],
+                game: {
+                    title: 'Currency Swing Simulator',
+                    concept: 'How Exchange Rates Affect Exporters vs. Consumers',
+                    prompt: 'Adjust the USD/JPY exchange rate to see what happens when the Yen weakens (higher number) vs. strengthens (lower number).',
+                    sliderLabel: 'USD / JPY Exchange Rate',
+                    min: 110,
+                    max: 165,
+                    step: 5,
+                    defaultVal: 148,
+                    unit: ' JPY',
+                    type: 'fx',
+                    quiz: {
+                        question: 'When the Japanese Yen becomes significantly weaker against the US Dollar, who benefits the most?',
+                        options: [
+                            { text: 'Japanese students importing American laptops', correct: false },
+                            { text: 'Japanese exporters selling cars to US customers', correct: true },
+                            { text: 'Local airlines buying imported jet fuel priced in USD', correct: false }
+                        ],
+                        explanation: 'Correct! Exporters earn US Dollars abroad and convert them back into many more Yen at home, boosting profits.'
+                    }
+                },
+                comments: [
+                    { user: 'Kenji T. (Exchange Student)', time: '25m ago', text: 'Visiting Tokyo right now feels super affordable with USD, though locals feel the higher grocery prices.' },
+                    { user: 'Sarah L. (Accounting)', time: '1h ago', text: 'Great example of why multinational companies need currency hedging on their income statements.' }
+                ]
+            },
+            saudi: {
+                id: 'saudi',
+                country: 'Saudi Arabia',
+                city: 'Riyadh • Energy Hub',
+                coords: [24.7136, 46.6753],
+                category: 'commodities',
+                categoryLabel: 'Commodities & Trade',
+                theme: 'amber',
+                badgeClass: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+                headline: 'OPEC+ Extends Voluntary Crude Oil Supply Cuts into Next Quarter',
+                source: 'Sample Commodities Wire • Energy Desk',
+                timestamp: 'Updated Today • Sample Data',
+                metrics: [
+                    { label: 'Brent Crude', value: '$82.40', change: '+2.30%', positive: true },
+                    { label: 'Supply Cut', value: '-1.2M bpd', change: 'Tightening', positive: false },
+                    { label: 'Energy ETF', value: '$91.15', change: '+1.65%', positive: true }
+                ],
+                breakdown: [
+                    'Major oil-producing nations agreed to keep pumping 1.2 million fewer barrels per day to prevent global oil prices from falling.',
+                    'When global demand stays steady while supply shrinks, basic economics pushes crude oil prices upward.',
+                    'Higher oil prices boost profits for energy producers, but raise shipping, electricity, and airline ticket costs worldwide.'
+                ],
+                terms: [
+                    { term: 'Supply Shock', def: 'An unexpected event that suddenly changes the supply of a commodity, causing rapid price swings.' },
+                    { term: 'Commodities', def: 'Raw materials like crude oil, gold, or wheat traded on global exchanges.' },
+                    { term: 'Cost-Push Inflation', def: 'Rising consumer prices triggered by higher raw material and energy costs.' }
+                ],
+                game: {
+                    title: 'Oil Supply Shock Lab',
+                    concept: 'Supply & Demand Ripple Effects',
+                    prompt: 'Slide the OPEC+ Daily Oil Output control to see how global supply shifts crude prices, gas stations, and airline profit margins.',
+                    sliderLabel: 'Global Oil Supply Adjustment',
+                    min: -3.0,
+                    max: 3.0,
+                    step: 0.5,
+                    defaultVal: -1.2,
+                    unit: 'M bpd',
+                    type: 'commodities',
+                    quiz: {
+                        question: 'If oil producers suddenly slash crude oil supply by 2.5 million barrels per day, which sector usually sees profit margins shrink?',
+                        options: [
+                            { text: 'Commercial airlines paying higher jet fuel bills', correct: true },
+                            { text: 'Oil drilling and exploration companies', correct: false },
+                            { text: 'Solar panel manufacturers facing zero fuel costs', correct: false }
+                        ],
+                        explanation: 'Nailed it! Fuel is one of an airline’s largest operating expenses, so oil price spikes directly squeeze airline profits.'
+                    }
+                },
+                comments: [
+                    { user: 'Omar R. (Supply Chain)', time: '14m ago', text: 'Crazy how a production vote in Riyadh changes gas prices and shipping fees across every continent.' },
+                    { user: 'Chloe W. (Business)', time: '55m ago', text: 'This connects directly to inflation—when diesel costs more, supermarket food prices follow.' }
+                ]
+            },
+            malaysia: {
+                id: 'malaysia',
+                country: 'Malaysia',
+                city: 'Kuala Lumpur • ASEAN Hub',
+                coords: [3.1390, 101.6869],
+                category: 'rates',
+                categoryLabel: 'Central Banks & Rates',
+                theme: 'sky',
+                badgeClass: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+                headline: 'Bank Negara Malaysia Maintains Overnight Policy Rate (OPR) at 3.00%',
+                source: 'Sample ASEAN Brief • Kuala Lumpur',
+                timestamp: 'Updated Today • Sample Data',
+                metrics: [
+                    { label: 'BNM OPR', value: '3.00%', change: 'Accommodative', positive: true },
+                    { label: 'USD / MYR', value: '4.32', change: '-0.35%', positive: true },
+                    { label: 'FBM KLCI', value: '1,618', change: '+0.45%', positive: true }
+                ],
+                breakdown: [
+                    'Malaysia’s central bank kept the Overnight Policy Rate (OPR) steady at 3.00% to support steady economic growth while keeping local inflation low.',
+                    'A stable OPR means monthly repayments on variable-rate car loans, housing mortgages, and personal financing stay predictable for households.',
+                    'Combined with resilient electronics exports and tourism inflows, the Ringgit strengthened slightly against the US Dollar.'
+                ],
+                terms: [
+                    { term: 'Overnight Policy Rate (OPR)', def: 'The benchmark interest rate at which banks lend money to each other overnight in Malaysia.' },
+                    { term: 'Monetary Policy', def: 'Central bank actions (like setting OPR) to manage money supply, inflation, and growth.' },
+                    { term: 'Purchasing Power', def: 'The real amount of goods and services that one unit of currency can buy.' }
+                ],
+                game: {
+                    title: 'OPR & Household Budget Sim',
+                    concept: 'How OPR Changes Monthly Loans & Currency',
+                    prompt: 'Adjust the Overnight Policy Rate (OPR) to observe how monthly loan installments and Ringgit strength respond.',
+                    sliderLabel: 'Set BNM OPR Rate',
+                    min: 1.75,
+                    max: 5.00,
+                    step: 0.25,
+                    defaultVal: 3.00,
+                    unit: '%',
+                    type: 'malaysia_rates',
+                    quiz: {
+                        question: 'When Bank Negara Malaysia keeps the OPR steady at 3.00% instead of hiking it, what happens to a borrower with a floating-rate loan?',
+                        options: [
+                            { text: 'Their monthly loan installment remains stable and predictable', correct: true },
+                            { text: 'Their existing loan balance is automatically forgiven', correct: false },
+                            { text: 'Their bank doubles their interest charges overnight', correct: false }
+                        ],
+                        explanation: 'Exactly! Floating-rate loans are priced off the base rate linked to OPR, so a steady OPR keeps monthly payments stable.'
+                    }
+                },
+                comments: [
+                    { user: 'Daniel T. (UM Econ)', time: '9m ago', text: 'Seeing OPR explained next to the US Fed rate makes cross-border capital flows so much clearer!' },
+                    { user: 'Aina Z. (Finance Year 1)', time: '37m ago', text: 'Stronger Ringgit is great news for buying international textbooks and software subscriptions.' }
+                ]
+            }
+        };
+
+        // =========================================================================
+        // 2. APPLICATION STATE (XP, Mastered Topics, Active Filter, Comments)
+        // =========================================================================
+        const appState = {
+            xp: 0,
+            mastered: new Set(),
+            activeEventId: null,
+            activeFilter: 'all',
+            markers: {}
+        };
+
+        // =========================================================================
+        // 3. INITIALIZE LEAFLET DARK WORLD MAP
+        // =========================================================================
+        let map;
+        window.onload = function () {
+            // Initialize map centered nicely to show Americas, Europe, Middle East, and Asia
+            map = L.map('map', {
+                center: [22.0, 35.0],
+                zoom: 2,
+                minZoom: 2,
+                maxZoom: 6,
+                worldCopyJump: true,
+                zoomControl: true
+            });
+
+            // CartoDB Dark Matter Tiles (Clean, sleek dark command center aesthetic, zero API key needed)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Render Hotspot Markers
+            renderMarkers();
+
+            // Setup Filter Buttons
+            setupFilterButtons();
+
+            // Open USA by default after a brief beat so user immediately sees how rich the experience is
+            setTimeout(() => {
+                selectEvent('usa', false);
+            }, 450);
+        };
+
+        // =========================================================================
+        // 4. RENDER PULSING HOTSPOT MARKERS ON MAP
+        // =========================================================================
+        function renderMarkers() {
+            // Clear existing markers
+            Object.values(appState.markers).forEach(marker => map.removeLayer(marker));
+            appState.markers = {};
+
+            Object.values(FINANCIAL_EVENTS).forEach(ev => {
+                if (appState.activeFilter !== 'all' && ev.category !== appState.activeFilter) {
+                    return;
+                }
+
+                const isMastered = appState.mastered.has(ev.id);
+                const checkBadge = isMastered ? `<span class="text-emerald-400 ml-1">✓</span>` : '';
+
+                const customIcon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `
+                        <div class="hotspot-wrapper theme-${ev.theme}">
+                            <div class="hotspot-ring"></div>
+                            <div class="hotspot-core"></div>
+                            <div class="hotspot-label">${ev.country}${checkBadge}</div>
+                        </div>
+                    `,
+                    iconSize: [44, 44],
+                    iconAnchor: [22, 22]
+                });
+
+                const marker = L.marker(ev.coords, { icon: customIcon }).addTo(map);
+                marker.on('click', () => selectEvent(ev.id, true));
+                appState.markers[ev.id] = marker;
+            });
+        }
+
+        // =========================================================================
+        // 5. CATEGORY FILTERING LOGIC
+        // =========================================================================
+        function setupFilterButtons() {
+            const buttons = document.querySelectorAll('.filter-btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Update button styles
+                    buttons.forEach(b => {
+                        b.classList.remove('bg-sky-500', 'text-slate-950', 'font-semibold', 'shadow-md', 'shadow-sky-500/25');
+                        b.classList.add('bg-slate-800/80', 'text-slate-300', 'font-medium', 'border', 'border-slate-700/70');
+                    });
+                    btn.classList.remove('bg-slate-800/80', 'text-slate-300', 'font-medium', 'border', 'border-slate-700/70');
+                    btn.classList.add('bg-sky-500', 'text-slate-950', 'font-semibold', 'shadow-md', 'shadow-sky-500/25');
+
+                    appState.activeFilter = btn.getAttribute('data-filter');
+                    renderMarkers();
+
+                    // If current open drawer doesn't match filter, close it
+                    if (appState.activeEventId && appState.activeFilter !== 'all') {
+                        const currentEv = FINANCIAL_EVENTS[appState.activeEventId];
+                        if (currentEv.category !== appState.activeFilter) {
+                            closeDrawer();
+                        }
+                    }
+                });
+            });
+        }
+
+        // =========================================================================
+        // 6. SELECT EVENT & OPEN SLIDE-OVER INTELLIGENCE DRAWER
+        // =========================================================================
+        function selectEvent(eventId, flyTo = true) {
+            const ev = FINANCIAL_EVENTS[eventId];
+            if (!ev) return;
+
+            appState.activeEventId = eventId;
+
+            // Highlight active dock button
+            document.querySelectorAll('.dock-btn').forEach(btn => {
+                btn.classList.remove('ring-2', 'ring-sky-400', 'bg-slate-800');
+            });
+            const activeDock = document.getElementById(`dock-${eventId}`);
+            if (activeDock) {
+                activeDock.classList.add('ring-2', 'ring-sky-400', 'bg-slate-800');
+            }
+
+            // Smoothly pan map to country
+            if (flyTo && map) {
+                const isDesktop = window.innerWidth >= 768;
+                // Offset longitude slightly on desktop so the drawer doesn't cover the marker
+                const targetLng = isDesktop ? ev.coords[1] + 22 : ev.coords[1];
+                map.flyTo([ev.coords[0], targetLng], 4, { duration: 1.1 });
+            }
+
+            // Update Drawer Header Badge
+            const badge = document.getElementById('drawer-category-badge');
+            badge.className = `text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${ev.badgeClass}`;
+            badge.textContent = ev.categoryLabel;
+
+            // Render Drawer Body
+            const isMastered = appState.mastered.has(ev.id);
+            const drawerContent = document.getElementById('drawer-content');
+
+            drawerContent.innerHTML = `
+                <!-- Location & Headline -->
+                <div>
+                    <div class="flex items-center gap-1.5 text-xs text-slate-400 mb-1.5">
+                        <i class="ph-fill ph-map-pin text-sky-400"></i>
+                        <span class="font-semibold text-slate-200">${ev.country}</span>
+                        <span>•</span>
+                        <span>${ev.city}</span>
+                    </div>
+                    <h2 class="text-xl font-bold text-white leading-snug tracking-tight">
+                        ${ev.headline}
+                    </h2>
+                    <p class="text-[11px] text-slate-400 mt-1.5 flex items-center gap-2">
+                        <span>${ev.source}</span>
+                        <span>•</span>
+                        <span class="text-amber-400/90">${ev.timestamp}</span>
+                    </p>
+                </div>
+
+                <!-- Key Market Indicators Grid -->
+                <div class="grid grid-cols-3 gap-2.5">
+                    ${ev.metrics.map(m => `
+                        <div class="bg-slate-850 border border-slate-800 p-3 rounded-xl">
+                            <div class="text-[11px] text-slate-400 truncate">${m.label}</div>
+                            <div class="font-mono font-bold text-sm sm:text-base text-white mt-0.5">${m.value}</div>
+                            <div class="text-[11px] font-mono mt-0.5 ${m.positive ? 'text-emerald-400' : 'text-rose-400'}">
+                                ${m.change}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <!-- Plain-English Breakdown -->
+                <div class="bg-slate-850/90 border border-slate-800 rounded-2xl p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                            <i class="ph-fill ph-sparkle"></i>
+                            Plain-English Breakdown
+                        </h3>
+                        <span class="text-[10px] text-slate-400">30-Sec Read</span>
+                    </div>
+                    <ul class="space-y-2.5 text-sm text-slate-300 leading-relaxed">
+                        ${ev.breakdown.map(point => `
+                            <li class="flex items-start gap-2.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-sky-400 mt-2 shrink-0"></span>
+                                <span>${point}</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+
+                <!-- Key Financial Terms (Interactive Hover/Tap Definitions) -->
+                <div>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                        Key Concepts to Know (Tap to inspect)
+                    </h3>
+                    <div class="space-y-2">
+                        ${ev.terms.map((t, idx) => `
+                            <details class="group bg-slate-850/60 border border-slate-800 rounded-xl overflow-hidden">
+                                <summary class="flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-xs font-semibold text-slate-200 hover:text-white list-none">
+                                    <span class="flex items-center gap-2">
+                                        <i class="ph-bold ph-book-open-text text-indigo-400"></i>
+                                        ${t.term}
+                                    </span>
+                                    <i class="ph-bold ph-caret-down text-slate-500 group-open:rotate-180 transition-transform"></i>
+                                </summary>
+                                <div class="px-3.5 pb-3 pt-1 text-xs text-slate-400 leading-relaxed border-t border-slate-800/60">
+                                    ${t.def}
+                                </div>
+                            </details>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <!-- Call to Action: Interactive Mini-Game -->
+                <div class="p-4 rounded-2xl bg-gradient-to-br from-sky-500/15 via-indigo-500/10 to-slate-900 border border-sky-500/30 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] font-mono uppercase tracking-wider text-sky-400 font-bold">Learn by Doing</span>
+                            <h4 class="font-bold text-white text-sm">${ev.game.title}</h4>
+                        </div>
+                        ${isMastered 
+                            ? `<span class="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30 flex items-center gap-1"><i class="ph-fill ph-check-circle"></i> Mastered</span>`
+                            : `<span class="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-mono font-bold border border-amber-500/30">+50 XP</span>`
+                        }
+                    </div>
+                    <p class="text-xs text-slate-300">
+                        Test how ${ev.game.concept.toLowerCase()} works in real time with our interactive simulator.
+                    </p>
+                    <button onclick="openGameModal('${ev.id}')" class="w-full py-2.5 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20">
+                        <i class="ph-fill ph-play-circle text-lg"></i>
+                        <span>${isMastered ? 'Replay 30-Sec Concept Game' : 'Play 30-Sec Concept Game'}</span>
+                    </button>
+                </div>
+
+                <!-- Student Discussion Wall Preview -->
+                <div class="border-t border-slate-800 pt-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <i class="ph-fill ph-chats-circle text-emerald-400 text-sm"></i>
+                            Student Discussion Wall
+                        </h3>
+                        <span class="text-[11px] text-slate-500">${ev.comments.length} notes</span>
+                    </div>
+
+                    <div id="comments-list" class="space-y-2.5">
+                        ${ev.comments.map(c => `
+                            <div class="bg-slate-850/80 border border-slate-800/90 p-3 rounded-xl space-y-1">
+                                <div class="flex items-center justify-between text-[11px]">
+                                    <span class="font-semibold text-sky-300">${c.user}</span>
+                                    <span class="text-slate-500">${c.time}</span>
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed">${c.text}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <!-- Quick Reply Input -->
+                    <form onsubmit="handleAddComment(event, '${ev.id}')" class="flex gap-2 pt-1">
+                        <input 
+                            type="text" 
+                            id="comment-input-${ev.id}"
+                            placeholder="Ask a question or share your take..." 
+                            class="flex-1 bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                            required
+                        >
+                        <button type="submit" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 font-semibold text-xs border border-slate-700 transition-colors">
+                            Post
+                        </button>
+                    </form>
+                </div>
+            `;
+
+            // Slide Drawer Open
+            document.getElementById('intel-drawer').classList.remove('translate-x-full');
+        }
+
+        function closeDrawer() {
+            document.getElementById('intel-drawer').classList.add('translate-x-full');
+            document.querySelectorAll('.dock-btn').forEach(btn => {
+                btn.classList.remove('ring-2', 'ring-sky-400', 'bg-slate-800');
+            });
+            appState.activeEventId = null;
+        }
+
+        // =========================================================================
+        // 7. STUDENT DISCUSSION COMMENT HANDLER
+        // =========================================================================
+        function handleAddComment(e, eventId) {
+            e.preventDefault();
+            const input = document.getElementById(`comment-input-${eventId}`);
+            const text = input.value.trim();
+            if (!text) return;
+
+            FINANCIAL_EVENTS[eventId].comments.unshift({
+                user: 'You (Student Explorer)',
+                time: 'Just now',
+                text: text
+            });
+
+            input.value = '';
+            selectEvent(eventId, false); // Re-render drawer cleanly
+            showToast('Comment posted to Student Discussion Wall!', 'sky');
+        }
+
+        // =========================================================================
+        // 8. INTERACTIVE 30-SECOND MINI-GAME SIMULATOR MODAL
+        // =========================================================================
+        function openGameModal(eventId) {
+            const ev = FINANCIAL_EVENTS[eventId];
+            if (!ev) return;
+
+            const g = ev.game;
+            document.getElementById('game-modal-title').textContent = `${g.title} (${ev.country})`;
+
+            const body = document.getElementById('game-modal-body');
+            body.innerHTML = `
+                <p class="text-xs text-slate-300 leading-relaxed bg-slate-850 p-3.5 rounded-xl border border-slate-800">
+                    ${g.prompt}
+                </p>
+
+                <!-- Interactive Slider Control -->
+                <div class="bg-slate-850 border border-slate-700/80 p-4 rounded-2xl space-y-4">
+                    <div class="flex items-center justify-between">
+                        <label for="sim-slider" class="text-xs font-bold uppercase tracking-wider text-slate-300">
+                            ${g.sliderLabel}
+                        </label>
+                        <span id="sim-slider-val" class="font-mono text-base font-bold text-sky-400 bg-sky-500/10 px-2.5 py-0.5 rounded-lg border border-sky-500/30">
+                            ${g.defaultVal}${g.unit}
+                        </span>
+                    </div>
+
+                    <input 
+                        type="range" 
+                        id="sim-slider" 
+                        min="${g.min}" 
+                        max="${g.max}" 
+                        step="${g.step}" 
+                        value="${g.defaultVal}"
+                        class="w-full"
+                    >
+
+                    <!-- Live Animated Impact Bars -->
+                    <div id="sim-outputs" class="space-y-3 pt-2 border-t border-slate-800">
+                        <!-- Dynamically updated on slider input -->
+                    </div>
+                </div>
+
+                <!-- 1-Question Comprehension Check -->
+                <div class="space-y-3 pt-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                            <i class="ph-fill ph-exam"></i>
+                            Quick Concept Check (+50 XP)
+                        </span>
+                    </div>
+                    <p class="text-sm font-semibold text-white leading-snug">
+                        ${g.quiz.question}
+                    </p>
+                    <div id="quiz-options" class="space-y-2">
+                        ${g.quiz.options.map((opt, idx) => `
+                            <button 
+                                onclick="handleQuizAnswer('${eventId}', ${idx}, ${opt.correct})"
+                                class="quiz-opt-btn w-full text-left p-3 rounded-xl bg-slate-850 hover:bg-slate-800 border border-slate-700/80 text-xs text-slate-200 transition-all flex items-center justify-between gap-2"
+                            >
+                                <span>${opt.text}</span>
+                                <i class="ph-bold ph-arrow-right text-slate-500 shrink-0"></i>
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div id="quiz-feedback" class="hidden p-3.5 rounded-xl text-xs leading-relaxed"></div>
+                </div>
+            `;
+
+            const slider = document.getElementById('sim-slider');
+            const updateSim = () => updateSimulatorOutputs(g.type, parseFloat(slider.value), g.unit);
+            slider.addEventListener('input', updateSim);
+            updateSim(); // Initial calculation
+
+            const modal = document.getElementById('game-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function updateSimulatorOutputs(type, val, unit) {
+            document.getElementById('sim-slider-val').textContent = `${val > 0 && type === 'commodities' ? '+' : ''}${val}${unit}`;
+            const container = document.getElementById('sim-outputs');
+
+            let metrics = [];
+
+            if (type === 'rates') {
+                // Higher interest rate -> lower inflation, lower stock valuation, higher student loan cost
+                const inflation = Math.max(1.2, (8.5 - val * 0.85)).toFixed(1);
+                const stockValuation = Math.min(95, Math.max(20, Math.round(105 - val * 10)));
+                const loanCost = Math.min(95, Math.max(15, Math.round(val * 11.5)));
+
+                metrics = [
+                    { label: 'Projected Inflation Rate', display: `${inflation}%`, pct: Math.min(100, inflation * 12), color: inflation > 4 ? 'bg-rose-500' : 'bg-emerald-500' },
+                    { label: 'Tech Stock Valuation Appetite', display: `${stockValuation}/100`, pct: stockValuation, color: 'bg-sky-500' },
+                    { label: 'Student & Auto Loan Burden', display: `${loanCost}/100`, pct: loanCost, color: loanCost > 60 ? 'bg-amber-500' : 'bg-emerald-500' }
+                ];
+            } else if (type === 'fx') {
+                // Higher USD/JPY (weaker Yen) -> higher exporter profit, higher import cost
+                const norm = (val - 110) / (165 - 110); // 0 to 1
+                const exporterProfit = Math.round(30 + norm * 65);
+                const importCost = Math.round(25 + norm * 70);
+                const tourismBoom = Math.round(35 + norm * 60);
+
+                metrics = [
+                    { label: 'Japanese Exporter Profits (e.g., Autos)', display: `${exporterProfit}/100`, pct: exporterProfit, color: 'bg-emerald-500' },
+                    { label: 'Imported Tech & Fuel Cost for Locals', display: `${importCost}/100`, pct: importCost, color: 'bg-rose-500' },
+                    { label: 'Foreign Tourist Spending Power', display: `${tourismBoom}/100`, pct: tourismBoom, color: 'bg-sky-500' }
+                ];
+            } else if (type === 'commodities') {
+                // Negative supply adjustment (cuts) -> higher crude price, lower airline margins
+                const cutSeverity = (3.0 - val) / 6.0; // 0 (oversupply) to 1 (deep cut)
+                const oilPrice = Math.round(58 + cutSeverity * 48);
+                const airlineMargin = Math.round(85 - cutSeverity * 65);
+                const inflationPressure = Math.round(20 + cutSeverity * 72);
+
+                metrics = [
+                    { label: 'Brent Crude Oil Price', display: `$${oilPrice}/bbl`, pct: Math.min(100, oilPrice), color: 'bg-amber-500' },
+                    { label: 'Airline & Shipping Profit Margins', display: `${airlineMargin}/100`, pct: airlineMargin, color: airlineMargin < 40 ? 'bg-rose-500' : 'bg-emerald-500' },
+                    { label: 'Global Transport Inflation Pressure', display: `${inflationPressure}/100`, pct: inflationPressure, color: 'bg-sky-500' }
+                ];
+            } else if (type === 'malaysia_rates') {
+                // OPR 1.75% to 5.00%
+                const norm = (val - 1.75) / (5.00 - 1.75);
+                const monthlyLoan = Math.round(1350 + norm * 580);
+                const ringgitStrength = Math.round(40 + norm * 52);
+                const householdSpending = Math.round(88 - norm * 48);
+
+                metrics = [
+                    { label: 'Sample Monthly Car/Home Loan', display: `RM ${monthlyLoan}`, pct: Math.round(30 + norm * 65), color: norm > 0.6 ? 'bg-rose-500' : 'bg-sky-500' },
+                    { label: 'MYR Currency Attractiveness', display: `${ringgitStrength}/100`, pct: ringgitStrength, color: 'bg-emerald-500' },
+                    { label: 'Domestic Consumer Spending', display: `${householdSpending}/100`, pct: householdSpending, color: 'bg-amber-500' }
+                ];
+            }
+
+            container.innerHTML = metrics.map(m => `
+                <div class="space-y-1">
+                    <div class="flex justify-between text-xs">
+                        <span class="text-slate-400">${m.label}</span>
+                        <span class="font-mono font-bold text-white">${m.display}</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                        <div class="h-full ${m.color} transition-all duration-200 rounded-full" style="width: ${m.pct}%"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function handleQuizAnswer(eventId, selectedIndex, isCorrect) {
+            const ev = FINANCIAL_EVENTS[eventId];
+            const feedback = document.getElementById('quiz-feedback');
+            const buttons = document.querySelectorAll('.quiz-opt-btn');
+
+            buttons.forEach((btn, idx) => {
+                btn.classList.remove('border-emerald-500', 'bg-emerald-500/15', 'border-rose-500', 'bg-rose-500/15');
+                if (idx === selectedIndex) {
+                    btn.classList.add(isCorrect ? 'border-emerald-500' : 'border-rose-500');
+                    btn.classList.add(isCorrect ? 'bg-emerald-500/15' : 'bg-rose-500/15');
+                }
+            });
+
+            feedback.classList.remove('hidden', 'bg-emerald-500/15', 'text-emerald-300', 'border-emerald-500/30', 'bg-rose-500/15', 'text-rose-300', 'border-rose-500/30');
+
+            if (isCorrect) {
+                feedback.classList.add('bg-emerald-500/15', 'text-emerald-300', 'border', 'border-emerald-500/30');
+                feedback.innerHTML = `<strong>Mastered!</strong> ${ev.game.quiz.explanation}`;
+
+                if (!appState.mastered.has(eventId)) {
+                    appState.mastered.add(eventId);
+                    appState.xp += 50;
+                    updateHeaderStats();
+                    renderMarkers();
+                    selectEvent(eventId, false); // Refresh drawer badge
+                    showToast(`+50 XP Earned! "${ev.country}" Concept Mastered.`, 'emerald');
+                }
+            } else {
+                feedback.classList.add('bg-rose-500/15', 'text-rose-300', 'border', 'border-rose-500/30');
+                feedback.innerHTML = `<strong>Not quite!</strong> Try adjusting the simulator slider above and pick another option.`;
+            }
+        }
+
+        function closeGameModal() {
+            const modal = document.getElementById('game-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // =========================================================================
+        // 9. PROGRESS TRACKER & TOAST NOTIFICATIONS
+        // =========================================================================
+        function updateHeaderStats() {
+            document.getElementById('xp-display').textContent = `${appState.xp} XP`;
+            document.getElementById('mastered-count').textContent = `${appState.mastered.size}/4`;
+        }
+
+        function toggleProgressModal() {
+            const modal = document.getElementById('progress-modal');
+            const isHidden = modal.classList.contains('hidden');
+
+            if (isHidden) {
+                const body = document.getElementById('progress-modal-body');
+                const pct = Math.round((appState.mastered.size / 4) * 100);
+
+                body.innerHTML = `
+                    <div class="bg-slate-850 border border-slate-800 p-4 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <div class="text-xs text-slate-400">Total Student XP</div>
+                            <div class="text-2xl font-mono font-bold text-amber-400">${appState.xp} XP</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-slate-400">Global Modules</div>
+                            <div class="text-lg font-bold text-white">${appState.mastered.size} of 4 Completed</div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between text-xs text-slate-400">
+                            <span>Curriculum Completion</span>
+                            <span class="font-mono text-white">${pct}%</span>
+                        </div>
+                        <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-sky-500 to-emerald-400 transition-all duration-300" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 pt-2">
+                        <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Regional Macro Modules</div>
+                        ${Object.values(FINANCIAL_EVENTS).map(ev => {
+                            const done = appState.mastered.has(ev.id);
+                            return `
+                                <div onclick="toggleProgressModal(); selectEvent('${ev.id}', true);" class="flex items-center justify-between p-3 rounded-xl bg-slate-850/90 hover:bg-slate-800 border border-slate-800 cursor-pointer transition-colors">
+                                    <div>
+                                        <div class="text-xs font-bold text-white">${ev.country} — ${ev.game.title}</div>
+                                        <div class="text-[11px] text-slate-400">${ev.game.concept}</div>
+                                    </div>
+                                    ${done 
+                                        ? `<span class="text-xs font-bold text-emerald-400 flex items-center gap-1"><i class="ph-fill ph-check-circle"></i> +50 XP</span>`
+                                        : `<span class="text-xs font-medium text-sky-400">Start →</span>`
+                                    }
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function showToast(message, color = 'emerald') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const borderClass = color === 'emerald' ? 'border-emerald-500/40 text-emerald-300' : 'border-sky-500/40 text-sky-300';
+            toast.className = `bg-slate-900/95 backdrop-blur-md border ${borderClass} px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold flex items-center gap-2 transition-all duration-300 transform translate-y-0 opacity-100`;
+            toast.innerHTML = `<i class="ph-fill ph-sparkle text-base"></i><span>${message}</span>`;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+    </script>
+</body>
+</html>
