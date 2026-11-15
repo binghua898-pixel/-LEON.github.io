@@ -1,167 +1,1046 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Macro Map & Live Tracker</title>
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; height: 100vh; overflow: hidden; }
-        #sidebar { width: 420px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
-        .sidebar-header { padding: 24px; border-bottom: 1px solid #334155; background: #111827; }
-        .sidebar-header h1 { margin: 0 0 8px 0; font-size: 20px; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
-        .sidebar-header p { margin: 0; font-size: 13px; color: #94a3b8; line-height: 1.4; }
-        #event-list { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-        .event-card { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s ease; position: relative; }
-        .event-card:hover { border-color: #38bdf8; transform: translateY(-2px); }
-        .event-card.active { border-color: #38bdf8; background: #172554; box-shadow: 0 0 15px rgba(56,189,248,0.15); }
-        .badge { display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; border-radius: 4px; background: #0284c7; color: #e0f2fe; margin-bottom: 8px; }
-        .event-title { font-size: 15px; font-weight: 600; margin: 0 0 8px 0; color: #f1f5f9; line-height: 1.3; }
-        .metric-box { background: #1e293b; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border: 1px solid #334155; }
-        .metric-label { font-size: 12px; color: #94a3b8; }
-        .metric-value { font-size: 15px; font-weight: 700; color: #38bdf8; }
-        .summary-text { font-size: 13px; color: #cbd5e1; margin: 0; line-height: 1.4; }
-        #map { flex: 1; height: 100%; background: #0b0f19; }
-    </style>
-</head>
-<body>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
-    <div id="sidebar">
-        <div class="sidebar-header">
-            <h1>🌍 Global Macro Monitor</h1>
-            <p>Interactive economic tracker. Click any card to inspect on map.</p>
-        </div>
-        <div id="event-list"></div>
+  <title>Macro Atlas · 财经学习地图</title>
+
+  <!-- 地图样式需要联网加载 -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  >
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --border: #334155;
+      --text: #f1f5f9;
+      --muted: #a8b7ca;
+      --accent: #67e8c5;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family:
+        -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    a:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      margin: 0;
+      color: var(--accent);
+      font-size: 23px;
+    }
+
+    header p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .button {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text);
+    }
+
+    .button:hover {
+      background: #304158;
+    }
+
+    .notice {
+      padding: 12px 24px;
+      background: #392f1c;
+      color: #f8dfa4;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 380px minmax(0, 1fr);
+      height: calc(100dvh - 145px);
+      min-height: 580px;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+    }
+
+    .filters {
+      padding: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .filters label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .filters input,
+    .filters select {
+      width: 100%;
+      padding: 11px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .filter-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .filter-row select {
+      flex: 1;
+      min-width: 0;
+    }
+
+    #result-count {
+      margin: 12px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    #event-list {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 14px;
+    }
+
+    .event-card {
+      display: block;
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 17px;
+      text-align: left;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .event-card:hover {
+      border-color: var(--accent);
+    }
+
+    .event-card.active {
+      border-color: var(--accent);
+      background: #173c40;
+    }
+
+    .badge {
+      color: var(--accent);
+      font-size: 12px;
+    }
+
+    .event-card h2 {
+      margin: 9px 0;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .event-card p {
+      margin: 8px 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    .metric strong {
+      color: var(--accent);
+      text-align: right;
+    }
+
+    .main {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    .map-area {
+      position: relative;
+      flex: 1 0 320px;
+      min-height: 320px;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      min-height: 320px;
+      background: #111d2c;
+    }
+
+    #map-status {
+      position: absolute;
+      bottom: 35px;
+      left: 15px;
+      right: 65px;
+      z-index: 500;
+      padding: 10px;
+      border-radius: 8px;
+      background: #392f1cf0;
+      color: #f8dfa4;
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    #map-status:empty {
+      display: none;
+    }
+
+    #detail {
+      padding: 24px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+    }
+
+    #detail h2 {
+      margin: 8px 0 18px;
+      font-size: 21px;
+    }
+
+    #detail h3 {
+      margin: 16px 0 6px;
+      font-size: 14px;
+      color: var(--accent);
+    }
+
+    #detail p {
+      margin: 6px 0;
+      color: #d3deeb;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    #detail a {
+      color: var(--accent);
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 26px;
+    }
+
+    .quiz {
+      padding-left: 20px;
+      border-left: 2px solid var(--accent);
+    }
+
+    .quiz button {
+      margin: 7px 7px 7px 0;
+    }
+
+    .meta {
+      color: var(--muted) !important;
+      font-size: 12px !important;
+    }
+
+    .empty {
+      padding: 20px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .leaflet-popup-content-wrapper,
+    .leaflet-popup-tip {
+      background: var(--panel);
+      color: var(--text);
+    }
+
+    @media (max-width: 1000px) {
+      .layout {
+        grid-template-columns: 320px minmax(0, 1fr);
+      }
+
+      .detail-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 680px) {
+      header {
+        padding: 16px;
+      }
+
+      header h1 {
+        font-size: 19px;
+      }
+
+      .notice {
+        padding: 10px 16px;
+      }
+
+      .layout {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        min-height: 0;
+      }
+
+      .sidebar {
+        border-right: none;
+      }
+
+      #event-list {
+        max-height: 330px;
+      }
+
+      .main {
+        overflow: visible;
+      }
+
+      .map-area {
+        flex: none;
+        height: 350px;
+      }
+
+      #detail {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div>
+      <h1>🌍 Macro Atlas</h1>
+      <p>财经学习地图 · 看懂新闻背后的知识</p>
     </div>
 
-    <div id="map"></div>
+    <button
+      id="reset-map"
+      class="button"
+      type="button"
+    >
+      全球视图
+    </button>
+  </header>
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        // 核心数据源（直接写在代码里，100% 稳定呈现，绝不会出现跨域或网络加载失败）
-        const macroEvents = [
-            {
-                id: "usa",
-                category: "Central Banks",
-                headline: "US CPI & PPI Keep Fed Hawkish Ahead of Dec Rate Call",
-                metric_label: "Dec Hike Odds",
-                metric_value: "81%",
-                summary: "Stubborn inflation data released this week pushed markets to price in an 81% chance of another Federal Reserve rate hike in December.",
-                lat: 38.90,
-                lng: -77.03
-            },
-            {
-                id: "mideast",
-                category: "Commodities",
-                headline: "Hormuz Transit Tensions Keep Brent Crude Elevated",
-                metric_label: "Brent Crude",
-                metric_value: "$94 - $113/bbl",
-                summary: "Ongoing geopolitical friction in the Persian Gulf continues to disrupt tanker routes, keeping global energy prices and inflation risks high.",
-                lat: 26.56,
-                lng: 56.25
-            },
-            {
-                id: "uk",
-                category: "Macro Economy",
-                headline: "UK Q3 GDP Beats Forecasts at 0.7% Quarterly Growth",
-                metric_label: "Q3 GDP (QoQ)",
-                metric_value: "+0.7%",
-                summary: "Newly released data shows the UK economy grew faster than expected in Q3, driven by resilient manufacturing and services output.",
-                lat: 51.50,
-                lng: -0.12
-            },
-            {
-                id: "sg",
-                category: "Global Markets",
-                headline: "Singapore FinTech Festival Kicks Off This Week",
-                metric_label: "Event Dates",
-                metric_value: "Nov 18–20",
-                summary: "Global central bankers and financial leaders gather in Singapore this week to discuss cross-border payments and AI in banking.",
-                lat: 1.35,
-                lng: 103.81
-            }
-        ];
+  <div class="notice" role="status">
+    教学示例模式：以下内容均为假设情境，不是实时新闻或行情。
+    地图需要联网，学习卡片可独立使用。
+  </div>
 
-        // 初始化地图
-        const map = L.map('map', { zoomControl: false }).setView([20, 0], 3);
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
+  <div class="layout">
+    <aside class="sidebar" aria-label="财经事件">
+      <div class="filters">
+        <label for="search">搜索主题或知识点</label>
 
-        // 使用稳定免费的开源底图
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 18,
-            attribution: '&copy; OpenStreetMap contributors'
+        <input
+          id="search"
+          type="search"
+          placeholder="例如：利率、利润、现金"
+        >
+
+        <div class="filter-row">
+          <select id="category" aria-label="按主题筛选">
+            <option value="all">全部主题</option>
+          </select>
+
+          <button
+            id="clear-filter"
+            class="button"
+            type="button"
+          >
+            重置
+          </button>
+        </div>
+
+        <p id="result-count" aria-live="polite"></p>
+      </div>
+
+      <div id="event-list"></div>
+    </aside>
+
+    <main class="main">
+      <div class="map-area">
+        <div id="map" aria-label="世界财经地图"></div>
+
+        <div id="map-status" role="status">
+          正在加载地图……
+        </div>
+      </div>
+
+      <section id="detail" aria-label="事件解释与练习"></section>
+    </main>
+  </div>
+
+  <script>
+    "use strict";
+
+    /*
+     * 这里是教学示例数据，不是实时新闻。
+     *
+     * 将来接入新闻时，需要由后端获取、核对并返回数据。
+     * 不要在公开网页中存放新闻服务的私密 API Key。
+     *
+     * 真实新闻可增加：
+     * sourceName: 来源名称
+     * sourceUrl: 原始报道链接
+     * publishedAt: 带时区的 ISO 日期
+     */
+
+    const macroEvents = [
+      {
+        id: "us-rates",
+        category: "央行与利率",
+        headline: "假设央行加息，为什么企业会受影响？",
+        metricLabel: "假设利率变化",
+        metricValue: "+0.25 个百分点",
+        summary:
+          "通过一个假设的加息情境，理解利率、借款成本和企业经营之间的联系。",
+        explanation:
+          "政策利率变化会影响融资环境，但不同贷款和存款利率不一定同步变化。借款成本增加，可能影响企业的投资与经营决策。",
+        relevance:
+          "如果你借钱开校园小店，计算利润时也要考虑利息支出，不能只看销售收入。",
+        lat: 38.90,
+        lng: -77.03,
+        demo: true,
+        quiz: {
+          question: "央行加息，是否意味着所有股票一定下跌？",
+          options: ["一定下跌", "不一定"],
+          answer: 1,
+          explanation:
+            "不一定。市场预期、企业盈利以及其他因素也会影响股价。"
+        }
+      },
+      {
+        id: "energy",
+        category: "能源与成本",
+        headline: "假设油价上涨，校园配送成本会怎样？",
+        metricLabel: "假设原油价格",
+        metricValue: "80 → 90 美元/桶",
+        summary:
+          "理解能源价格变化如何通过运输和生产环节影响经营成本。",
+        explanation:
+          "能源涨价可能推高运输和生产成本。企业可能提价、削减其他支出，或者接受利润下降，成本并不一定全部转嫁给消费者。",
+        relevance:
+          "摆摊或配送时，运输费用也需要考虑。即使销售额没有下降，利润仍可能减少。",
+        lat: 26.56,
+        lng: 56.25,
+        demo: true,
+        quiz: {
+          question:
+            "假设收入和其他条件不变，总成本上升，利润会怎样？",
+          options: ["减少", "增加", "保持不变"],
+          answer: 0,
+          explanation:
+            "利润等于收入减去费用。在这个假设下，成本增加使利润减少。"
+        }
+      },
+      {
+        id: "uk-gdp",
+        category: "宏观经济",
+        headline: "假设GDP增长，代表每个人都更有钱吗？",
+        metricLabel: "假设实际GDP季度增长",
+        metricValue: "+0.5%",
+        summary:
+          "区分整体经济产出、个人收入和生活成本。",
+        explanation:
+          "实际GDP反映剔除价格变化后的经济产出。整体增长不等于所有人的工资同步增长，也不能单独反映收入分配。",
+        relevance:
+          "判断就业环境时，还要看所在行业、工资和物价变化，不能只看一个GDP数字。",
+        lat: 51.50,
+        lng: -0.12,
+        demo: true,
+        quiz: {
+          question: "实际GDP增长等于所有人的工资上涨吗？",
+          options: ["是", "不是"],
+          answer: 1,
+          explanation:
+            "不是。总体产出与个人工资是不同指标，增长也可能集中在部分行业。"
+        }
+      },
+      {
+        id: "my-accounting",
+        category: "会计与经营",
+        headline: "校园小店赚了钱，为什么现金反而变少？",
+        metricLabel: "期末现金 / 利润",
+        metricValue: "RM180 / RM40",
+        summary:
+          "假设你有RM200，花RM120买40份零食，再以每份RM5卖出20份并收款，没有其他费用。",
+        explanation:
+          "收入为RM100，已售商品成本为RM60，因此利润为RM40。现金为200−120+100=RM180。剩下20份零食的存货成本是RM60。",
+        relevance:
+          "利润不等于现金。备货会占用资金，剩余存货没有卖出前不能直接当现金使用。",
+        lat: 2.92,
+        lng: 101.78,
+        demo: true,
+        quiz: {
+          question: "剩余20份零食的存货成本是多少？",
+          options: ["RM40", "RM60", "RM100"],
+          answer: 1,
+          explanation:
+            "每份成本RM3，剩余20份，因此存货成本为20×3=RM60。"
+        }
+      }
+    ];
+
+    let map = null;
+    let markerLayer = null;
+    let selectedId = null;
+
+    const markers = new Map();
+    const cards = new Map();
+
+    const searchInput = document.getElementById("search");
+    const categorySelect = document.getElementById("category");
+    const listElement = document.getElementById("event-list");
+    const detailElement = document.getElementById("detail");
+    const countElement = document.getElementById("result-count");
+    const mapStatus = document.getElementById("map-status");
+
+    // 使用 textContent 填充内容，避免把外部文本当成 HTML 执行。
+    function createElement(tag, text, className) {
+      const element = document.createElement(tag);
+
+      if (text !== undefined) {
+        element.textContent = text;
+      }
+
+      if (className) {
+        element.className = className;
+      }
+
+      return element;
+    }
+
+    function safeHttpUrl(value) {
+      try {
+        const url = new URL(value);
+
+        if (
+          url.protocol === "https:" ||
+          url.protocol === "http:"
+        ) {
+          return url.href;
+        }
+      } catch {
+        return null;
+      }
+
+      return null;
+    }
+
+    function prefersReducedMotion() {
+      return window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+    }
+
+    function initializeCategories() {
+      const categories = [
+        ...new Set(macroEvents.map(event => event.category))
+      ];
+
+      categories.forEach(category => {
+        categorySelect.add(new Option(category, category));
+      });
+    }
+
+    function getFilteredEvents() {
+      const keyword = searchInput.value.trim().toLowerCase();
+      const category = categorySelect.value;
+
+      return macroEvents.filter(event => {
+        const matchesCategory =
+          category === "all" ||
+          event.category === category;
+
+        const searchableText = [
+          event.headline,
+          event.category,
+          event.summary,
+          event.explanation,
+          event.relevance
+        ].join(" ").toLowerCase();
+
+        return (
+          matchesCategory &&
+          searchableText.includes(keyword)
+        );
+      });
+    }
+
+    function renderEvents() {
+      const events = getFilteredEvents();
+
+      listElement.replaceChildren();
+      cards.clear();
+      markers.clear();
+
+      // 每次刷新先移除旧标记，避免重复打点。
+      if (markerLayer) {
+        markerLayer.clearLayers();
+      }
+
+      countElement.textContent =
+        `显示 ${events.length} / ${macroEvents.length} 条`;
+
+      if (events.length === 0) {
+        selectedId = null;
+
+        listElement.append(
+          createElement(
+            "p",
+            "没有匹配结果，请尝试其他关键词或重置筛选。",
+            "empty"
+          )
+        );
+
+        detailElement.replaceChildren(
+          createElement("p", "请选择一个事件开始学习。")
+        );
+
+        return;
+      }
+
+      events.forEach(event => {
+        const card = createElement(
+          "button",
+          undefined,
+          "event-card"
+        );
+
+        card.type = "button";
+        card.setAttribute("aria-pressed", "false");
+
+        const metric = createElement(
+          "div",
+          undefined,
+          "metric"
+        );
+
+        metric.append(
+          createElement("span", event.metricLabel),
+          createElement("strong", event.metricValue)
+        );
+
+        card.append(
+          createElement("span", event.category, "badge"),
+          createElement("h2", event.headline),
+          createElement("p", event.summary),
+          metric
+        );
+
+        card.addEventListener("click", () => {
+          selectEvent(event.id, true);
+        });
+
+        cards.set(event.id, card);
+        listElement.append(card);
+
+        if (map && markerLayer) {
+          addMarker(event);
+        }
+      });
+
+      const currentStillVisible = events.some(
+        event => event.id === selectedId
+      );
+
+      selectEvent(
+        currentStillVisible ? selectedId : events[0].id,
+        false
+      );
+    }
+
+    function addMarker(event) {
+      const marker = L.circleMarker(
+        [event.lat, event.lng],
+        {
+          radius: 8,
+          fillColor: "#67e8c5",
+          color: "#ffffff",
+          weight: 2,
+          fillOpacity: 0.9
+        }
+      ).addTo(markerLayer);
+
+      const popup = createElement("div");
+
+      popup.append(
+        createElement("strong", event.headline),
+        createElement(
+          "p",
+          `${event.metricLabel}：${event.metricValue}`
+        )
+      );
+
+      marker.bindPopup(popup);
+
+      marker.on("click", () => {
+        selectEvent(event.id, true);
+      });
+
+      markers.set(event.id, marker);
+    }
+
+    function selectEvent(id, moveMap) {
+      const event = macroEvents.find(item => item.id === id);
+
+      if (!event) return;
+
+      selectedId = id;
+
+      cards.forEach((card, cardId) => {
+        const active = cardId === id;
+
+        card.classList.toggle("active", active);
+        card.setAttribute("aria-pressed", String(active));
+      });
+
+      markers.forEach((marker, markerId) => {
+        marker.setStyle({
+          radius: markerId === id ? 11 : 8,
+          fillColor:
+            markerId === id ? "#fbbf24" : "#67e8c5"
+        });
+      });
+
+      renderDetail(event);
+
+      if (!moveMap) return;
+
+      const card = cards.get(id);
+
+      if (card) {
+        // 只滚动卡片列表，不强制滚动整个页面。
+        const listRect = listElement.getBoundingClientRect();
+        const cardRect = card.getBoundingClientRect();
+
+        listElement.scrollTo({
+          top:
+            listElement.scrollTop +
+            cardRect.top -
+            listRect.top -
+            12,
+          behavior: prefersReducedMotion() ? "auto" : "smooth"
+        });
+      }
+
+      if (map) {
+        if (prefersReducedMotion()) {
+          map.setView([event.lat, event.lng], 5);
+        } else {
+          map.flyTo([event.lat, event.lng], 5, {
+            duration: 1.1
+          });
+        }
+
+        const marker = markers.get(id);
+
+        if (marker) {
+          marker.openPopup();
+        }
+      }
+    }
+
+    function renderDetail(event) {
+      detailElement.replaceChildren();
+
+      detailElement.append(
+        createElement("span", event.category, "badge"),
+        createElement("h2", event.headline)
+      );
+
+      const grid = createElement(
+        "div",
+        undefined,
+        "detail-grid"
+      );
+
+      const explanation = createElement("div");
+
+      explanation.append(
+        createElement("h3", "用人话解释"),
+        createElement("p", event.explanation),
+        createElement("h3", "和大学生有什么关系？"),
+        createElement("p", event.relevance)
+      );
+
+      const source = createElement("p", undefined, "meta");
+
+      if (event.demo) {
+        source.textContent =
+          "来源：本站假设教学案例 · 非真实新闻";
+      } else {
+        const sourceUrl = safeHttpUrl(event.sourceUrl);
+
+        if (sourceUrl) {
+          const link = createElement(
+            "a",
+            event.sourceName || "查看原始来源"
+          );
+
+          link.href = sourceUrl;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+
+          source.append(link);
+        } else {
+          source.append("未提供有效来源链接");
+        }
+
+        const publishedAt = new Date(event.publishedAt);
+
+        if (
+          event.publishedAt &&
+          Number.isFinite(publishedAt.getTime())
+        ) {
+          source.append(
+            document.createTextNode(
+              " · 发布时间：" +
+              publishedAt.toLocaleString("zh-CN", {
+                timeZone: "Asia/Kuala_Lumpur",
+                hour12: false
+              }) +
+              "（马来西亚时间）"
+            )
+          );
+        }
+      }
+
+      explanation.append(source);
+      grid.append(explanation);
+
+      if (event.quiz) {
+        grid.append(createQuiz(event.quiz));
+      }
+
+      detailElement.append(grid);
+    }
+
+    function createQuiz(quiz) {
+      const container = createElement(
+        "div",
+        undefined,
+        "quiz"
+      );
+
+      container.append(
+        createElement("h3", "30秒理解挑战"),
+        createElement("p", quiz.question)
+      );
+
+      const feedback = createElement("p");
+      feedback.setAttribute("role", "status");
+
+      const answerButtons = [];
+
+      quiz.options.forEach((option, index) => {
+        const button = createElement(
+          "button",
+          option,
+          "button"
+        );
+
+        button.type = "button";
+        button.setAttribute("aria-pressed", "false");
+
+        button.addEventListener("click", () => {
+          answerButtons.forEach(item => {
+            item.setAttribute("aria-pressed", "false");
+          });
+
+          button.setAttribute("aria-pressed", "true");
+
+          const correct = index === quiz.answer;
+
+          feedback.textContent =
+            (correct ? "✅ 答对了！" : "再想想：") +
+            quiz.explanation;
+        });
+
+        answerButtons.push(button);
+        container.append(button);
+      });
+
+      container.append(feedback);
+
+      return container;
+    }
+
+    function initializeMap() {
+      if (!window.L) {
+        mapStatus.textContent =
+          "地图组件加载失败，卡片和学习功能仍可使用。";
+        return;
+      }
+
+      try {
+        map = L.map("map", {
+          zoomControl: false
+        }).setView([20, 15], 2);
+
+        L.control.zoom({
+          position: "bottomright"
         }).addTo(map);
 
-        let markers = {};
-        let activeMarkerId = null;
+        markerLayer = L.layerGroup().addTo(map);
 
-        function renderApp(events) {
-            const listContainer = document.getElementById('event-list');
-            listContainer.innerHTML = '';
+        const tiles = L.tileLayer(
+          "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+          {
+            maxZoom: 18,
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">' +
+              "OpenStreetMap</a> contributors"
+          }
+        );
 
-            events.forEach((item, index) => {
-                const lat = parseFloat(item.lat);
-                const lng = parseFloat(item.lng);
-                const id = item.id || `event-${index}`;
+        let failedTiles = 0;
 
-                // 1. 创建左侧卡片
-                const card = document.createElement('div');
-                card.className = 'event-card';
-                card.innerHTML = `
-                    <span class="badge">${item.category}</span>
-                    <h3 class="event-title">${item.headline}</h3>
-                    <div class="metric-box">
-                        <span class="metric-label">${item.metric_label}</span>
-                        <span class="metric-value">${item.metric_value}</span>
-                    </div>
-                    <p class="summary-text">${item.summary}</p>
-                `;
+        tiles.on("loading", () => {
+          failedTiles = 0;
+        });
 
-                card.addEventListener('click', () => {
-                    selectEvent(id, lat, lng, card);
-                });
+        tiles.on("tileerror", () => {
+          failedTiles += 1;
 
-                listContainer.appendChild(card);
+          mapStatus.textContent =
+            "部分地图底图加载失败，请检查网络。学习内容仍可使用。";
+        });
 
-                // 2. 在地图上打点
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    const marker = L.circleMarker([lat, lng], {
-                        radius: 8,
-                        fillColor: '#38bdf8',
-                        color: '#ffffff',
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 0.8
-                    }).addTo(map);
+        tiles.on("load", () => {
+          if (failedTiles === 0) {
+            mapStatus.textContent = "";
+          }
+        });
 
-                    marker.bindPopup(`<b>${item.headline}</b><br>${item.metric_label}: ${item.metric_value}`);
-                    
-                    marker.on('click', () => {
-                        selectEvent(id, lat, lng, card);
-                    });
+        mapStatus.textContent = "正在加载地图底图……";
+        tiles.addTo(map);
 
-                    markers[id] = { marker, card, lat, lng };
-                }
-            });
+        if ("ResizeObserver" in window) {
+          const observer = new ResizeObserver(() => {
+            map.invalidateSize();
+          });
+
+          observer.observe(document.getElementById("map"));
         }
 
-        function selectEvent(id, lat, lng, cardElement) {
-            document.querySelectorAll('.event-card').forEach(c => c.classList.remove('active'));
-            cardElement.classList.add('active');
-            cardElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        renderEvents();
+      } catch (error) {
+        mapStatus.textContent =
+          "地图初始化失败，请重新打开页面。学习卡片仍可使用。";
 
-            if (!isNaN(lat) && !isNaN(lng)) {
-                map.flyTo([lat, lng], 5, { duration: 1.2 });
-                if (markers[id]) {
-                    markers[id].marker.openPopup();
-                }
-            }
+        console.error("Map initialization failed:", error);
+      }
+    }
+
+    searchInput.addEventListener("input", renderEvents);
+    categorySelect.addEventListener("change", renderEvents);
+
+    document
+      .getElementById("clear-filter")
+      .addEventListener("click", () => {
+        searchInput.value = "";
+        categorySelect.value = "all";
+        renderEvents();
+      });
+
+    document
+      .getElementById("reset-map")
+      .addEventListener("click", () => {
+        if (!map) {
+          mapStatus.textContent =
+            "地图当前不可用，请检查网络后重新打开页面。";
+          return;
         }
 
-        // 启动渲染
-        renderApp(macroEvents);
-    </script>
+        map.closePopup();
+        map.setView([20, 15], 2);
+      });
+
+    // 先显示卡片，避免地图加载失败导致整个页面不可用。
+    initializeCategories();
+    renderEvents();
+
+    // 异步加载地图组件。
+    const script = document.createElement("script");
+
+    script.src =
+      "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+
+    script.onload = initializeMap;
+
+    script.onerror = () => {
+      mapStatus.textContent =
+        "地图组件加载失败，请检查网络。卡片和练习仍可使用。";
+    };
+
+    document.head.append(script);
+
+    setTimeout(() => {
+      if (!map) {
+        mapStatus.textContent =
+          "地图加载较慢或网络不可用，你可以先浏览卡片和练习。";
+      }
+    }, 12000);
+  </script>
 </body>
 </html>
